@@ -132,3 +132,11 @@ vagrant up
 ```
 ansible all --become -m command -a "/usr/bin/docker version"
 ```
+
+- Vérifier que les VMs sont connectées au même réseau
+
+Note: Les IPs commencent par 192.168.77.21, puis +1 par VM
+
+```
+ansible all --become -m command -a "/bin/ping -c 4 192.168.77.21"
+```
