@@ -1,0 +1,18 @@
+---
+- hosts: all
+  tasks:
+    - name: installing nginx repo rpm
+      yum: name=http://nginx.org/packages/centos/7/noarch/RPMS/nginx-release-centos-7-0.el7.ngx.noarch.rpm
+      become: yes
+    - name: ensure nginx is at the latest version
+      yum: pkg=nginx state=latest
+      become: yes
+      notify:
+      - restart nginx
+    - name: ensure nginx is running
+      service: name=nginx state=started
+      become: yes
+  handlers:
+    - name: restart nginx
+      service: name=nginx state=restarted
+      become: yes

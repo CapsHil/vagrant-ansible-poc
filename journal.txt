@@ -1,0 +1,201 @@
+# Différences à appliquer: installation de nginx
+```
+cyrille@cyrille-zenika:~/Documents/vagrant-ansible/ntp-server$ diff playbook.yml playbook.yml.init 
+9,16d8
+<     - name: installing nginx repo rpm
+<       yum: name=http://nginx.org/packages/centos/7/noarch/RPMS/nginx-release-centos-7-0.el7.ngx.noarch.rpm
+<       become: yes
+<     - name: ensure nginx is at the latest version
+<       yum: pkg=nginx state=latest
+<       become: yes
+<       notify:
+<       - restart nginx
+21,23c13
+<     - name: restart nginx
+<       service: name=nginx state=restarted
+<       become: yes
+---
+> 
+```
+
+# On applique l'installation de nginx
+cyrille@cyrille-zenika:~/Documents/vagrant-ansible/ntp-server$ ansible-playbook playbook.yml --inventory-file=.vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory
+
+PLAY [all] *********************************************************************
+
+TASK [setup] *******************************************************************
+ok: [default]
+
+TASK [ensure ntpd is at the latest version] ************************************
+ok: [default]
+
+TASK [installing nginx repo rpm] ***********************************************
+changed: [default]
+
+TASK [ensure nginx is at the latest version] ***********************************
+changed: [default]
+
+RUNNING HANDLER [restart nginx] ************************************************
+changed: [default]
+
+PLAY RECAP *********************************************************************
+default                    : ok=5    changed=3    unreachable=0    failed=0   
+
+
+
+# Connexion à la VM pour vérifier l'install
+cyrille@cyrille-zenika:~/Documents/vagrant-ansible/ntp-server$ vagrant ssh
+Last login: Mon Apr  3 20:31:27 2017 from 10.0.2.2
+
+
+# Healthcheck
+[vagrant@localhost ~]$ sudo systemctl status nginx.service 
+● nginx.service - nginx - high performance web server
+   Loaded: loaded (/usr/lib/systemd/system/nginx.service; disabled; vendor preset: disabled)
+   Active: active (running) since lun. 2017-04-03 20:31:27 UTC; 1min 31s ago
+     Docs: http://nginx.org/en/docs/
+  Process: 32191 ExecStart=/usr/sbin/nginx -c /etc/nginx/nginx.conf (code=exited, status=0/SUCCESS)
+  Process: 32189 ExecStartPre=/usr/sbin/nginx -t -c /etc/nginx/nginx.conf (code=exited, status=0/SUCCESS)
+ Main PID: 32193 (nginx)
+   CGroup: /system.slice/nginx.service
+           ├─32193 nginx: master process /usr/sbin/nginx -c /etc/nginx/nginx.conf
+           └─32194 nginx: worker process
+
+avril 03 20:31:27 localhost.localdomain systemd[1]: Starting nginx - high performance web server...
+avril 03 20:31:27 localhost.localdomain nginx[32189]: nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+avril 03 20:31:27 localhost.localdomain nginx[32189]: nginx: configuration file /etc/nginx/nginx.conf test is successful
+avril 03 20:31:27 localhost.localdomain systemd[1]: Failed to read PID from file /run/nginx.pid: Invalid argument
+avril 03 20:31:27 localhost.localdomain systemd[1]: Started nginx - high performance web server.
+
+
+# Un ptit test vite fait
+[vagrant@localhost ~]$ curl -XGET http://localhost:80
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+    body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+    }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+[vagrant@localhost ~]$ 
+
+# Contenu de ansible.cfg
+[defaults]
+inventory = .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory
+
+# Plus besoin de taper l'option --inventory-file=.vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory
+cyrille@cyrille-zenika:~/Documents/vagrant-ansible/ntp-server$ vi ansible.cfg
+cyrille@cyrille-zenika:~/Documents/vagrant-ansible/ntp-server$ ansible all -m ping
+default | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+
+# Pb avec ansible sur vagrant-cluster-basic
+cyrille@cyrille-zenika:~/Documents/vagrant-ansible/vagrant-cluster-basic$ ansible all -m ping
+ERROR! Unexpected Exception: 'Host' object has no attribute 'remove_group'
+to see the full traceback, use -vvv
+==> https://github.com/ansible/ansible/issues/23016
+==> Downgrade de ansible en 2.2.1
+
+cyrille@cyrille-zenika:~/Documents/vagrant-ansible/vagrant-cluster-basic$ ansible all -m command -a "ps"
+vm1 | SUCCESS | rc=0 >>
+  PID TTY          TIME CMD
+12184 pts/0    00:00:00 sh
+12197 pts/0    00:00:00 python
+12198 pts/0    00:00:00 python
+12199 pts/0    00:00:00 ps
+
+vm2 | SUCCESS | rc=0 >>
+  PID TTY          TIME CMD
+12098 pts/0    00:00:00 sh
+12111 pts/0    00:00:00 python
+12112 pts/0    00:00:00 python
+12113 pts/0    00:00:00 ps
+
+
+
+# Pb avec ansible sur vagrant-cluster-network
+cyrille@cyrille-zenika:~/Documents/vagrant-ansible/vagrant-cluster-network$ ansible all -m ping
+machine3 | UNREACHABLE! => {
+    "changed": false, 
+    "msg": "Failed to connect to the host via ssh: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\r\n@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @\r\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\r\nIT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!\r\nSomeone could be eavesdropping on you right now (man-in-the-middle attack)!\r\nIt is also possible that a host key has just been changed.\r\nThe fingerprint for the ECDSA key sent by the remote host is\nSHA256:4PmiqcCX7A7mCj1GGWYs3bcecjKJuvrLhtmgjepSHXM.\r\nPlease contact your system administrator.\r\nAdd correct host key in /home/cyrille/.ssh/known_hosts to get rid of this message.\r\nOffending ECDSA key in /home/cyrille/.ssh/known_hosts:25\r\n  remove with:\r\n  ssh-keygen -f \"/home/cyrille/.ssh/known_hosts\" -R [127.0.0.1]:2201\r\nECDSA host key for [127.0.0.1]:2201 has changed and you have requested strict checking.\r\nHost key verification failed.\r\n", 
+    "unreachable": true
+}
+machine1 | UNREACHABLE! => {
+    "changed": false, 
+    "msg": "Failed to connect to the host via ssh: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\r\n@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @\r\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\r\nIT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!\r\nSomeone could be eavesdropping on you right now (man-in-the-middle attack)!\r\nIt is also possible that a host key has just been changed.\r\nThe fingerprint for the ECDSA key sent by the remote host is\nSHA256:hGMCVNGhdIt5In3ZPGM0WSEp8vX2tCnT2PnE3wQOaFg.\r\nPlease contact your system administrator.\r\nAdd correct host key in /home/cyrille/.ssh/known_hosts to get rid of this message.\r\nOffending ECDSA key in /home/cyrille/.ssh/known_hosts:23\r\n  remove with:\r\n  ssh-keygen -f \"/home/cyrille/.ssh/known_hosts\" -R [127.0.0.1]:2222\r\nECDSA host key for [127.0.0.1]:2222 has changed and you have requested strict checking.\r\nHost key verification failed.\r\n", 
+    "unreachable": true
+}
+machine2 | UNREACHABLE! => {
+    "changed": false, 
+    "msg": "Failed to connect to the host via ssh: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\r\n@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @\r\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\r\nIT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!\r\nSomeone could be eavesdropping on you right now (man-in-the-middle attack)!\r\nIt is also possible that a host key has just been changed.\r\nThe fingerprint for the ECDSA key sent by the remote host is\nSHA256:R92RcSoKVJcI+bmnatUM19IPX7TphRi6/I7LRk4PYTs.\r\nPlease contact your system administrator.\r\nAdd correct host key in /home/cyrille/.ssh/known_hosts to get rid of this message.\r\nOffending ECDSA key in /home/cyrille/.ssh/known_hosts:24\r\n  remove with:\r\n  ssh-keygen -f \"/home/cyrille/.ssh/known_hosts\" -R [127.0.0.1]:2200\r\nECDSA host key for [127.0.0.1]:2200 has changed and you have requested strict checking.\r\nHost key verification failed.\r\n", 
+    "unreachable": true
+}
+===> https://github.com/ansible/ansible/issues/9442
+cyrille@cyrille-zenika:~/Documents/vagrant-ansible/vagrant-cluster-network$ export ANSIBLE_HOST_KEY_CHECKING=False
+cyrille@cyrille-zenika:~/Documents/vagrant-ansible/vagrant-cluster-network$ ansible machine1 -m ping
+machine1 | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+cyrille@cyrille-zenika:~/Documents/vagrant-ansible/vagrant-cluster-network$ ansible all -m ping
+machine1 | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+machine3 | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+machine2 | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+
+
+# Verification de machine1 voit machine2 et machine3 via l'IP
+[vagrant@machine1 ~]$ ping 192.168.77.22
+PING 192.168.77.22 (192.168.77.22) 56(84) bytes of data.
+64 bytes from 192.168.77.22: icmp_seq=1 ttl=64 time=0.211 ms
+^C
+--- 192.168.77.22 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.211/0.211/0.211/0.000 ms
+[vagrant@machine1 ~]$ ping 192.168.77.23
+PING 192.168.77.23 (192.168.77.23) 56(84) bytes of data.
+64 bytes from 192.168.77.23: icmp_seq=1 ttl=64 time=0.231 ms
+64 bytes from 192.168.77.23: icmp_seq=2 ttl=64 time=0.227 ms
+^C
+--- 192.168.77.23 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1000ms
+rtt min/avg/max/mdev = 0.227/0.229/0.231/0.002 ms
+
+
+cyrille@cyrille-zenika:~/Documents/vagrant-ansible/vagrant-cluster-network$ ansible all -m command -a "/usr/bin/docker --version"
+machine2 | SUCCESS | rc=0 >>
+Docker version 17.03.1-ce, build c6d412e
+
+machine1 | SUCCESS | rc=0 >>
+Docker version 17.03.1-ce, build c6d412e
+
+machine3 | SUCCESS | rc=0 >>
+Docker version 17.03.1-ce, build c6d412e

@@ -1,0 +1,19 @@
+Vagrant.configure("2") do |config|
+
+  config.vm.box = "centos/7"
+
+  config.vm.define "vm1"
+  config.vm.define "vm2"
+
+  config.vm.provision "ansible" do |ansible|
+    ansible.playbook = "playbook.yml"
+    ansible.groups = {
+      "group1" => ["vm1"],
+      "group2" => ["vm2"],
+      "group3" => ["vm[1:2]"],
+      "all_groups:children" => ["group1", "group2"],
+      "group1:vars" => {"variable1" => 9,
+                        "variable2" => "example"}
+    }
+  end
+end
