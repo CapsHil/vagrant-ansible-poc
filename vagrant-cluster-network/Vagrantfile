@@ -1,6 +1,6 @@
 Vagrant.configure("2") do |config|
 
-  config.vm.box = "centos/7"
+  config.vm.box = "ubuntu/xenial64"
 
   N = 4
   (1..N).each do |machine_id|
@@ -13,7 +13,8 @@ Vagrant.configure("2") do |config|
       if machine_id == N
         machine.vm.provision :ansible do |ansible|
           # Disable default limit to connect to all the machines
-          # ansible.limit = "all"
+          # If not disabled, only machine4 will be provisionned
+          ansible.limit = "all"
           ansible.playbook = "playbook.yml"
         end
       end

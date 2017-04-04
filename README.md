@@ -1,6 +1,6 @@
 # Requirement
 
-- vagrant 1.8.1
+- vagrant 1.9.3
 - ansible 2.2.1.0 (bug avec la 2.2.2.0)
 - virtualbox 5.0
 
@@ -11,6 +11,12 @@
 ```
 watch -n 1 vagrant global-status
 ```
+
+
+## ansible basic commands
+
+http://docs.ansible.com/ansible/intro_adhoc.html
+
 
 # vagrant-basic
 
@@ -80,4 +86,49 @@ ansible default --become -m command -a "/usr/bin/systemctl stop nginx"
 
 ```
 ansible default --become -m command -a "/usr/bin/systemctl start nginx"
+```
+
+On peut changer le contenu du playbook (playbook.yml) et appliquer les changements
+
+```
+ansible-playbook playbook.yml
+```
+
+# vagrant-cluster-basic
+
+OS: centos/7
+
+Objectif: vagrant lance plusieurs VMs, configurables via ansible. vagrant génère l'inventaire pour ansible dans .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory. Le fichier ansible.cfg permet d'indiquer le fichier d'inventaire à ansible.
+
+Note: les 2 VMs ne peuvent pas se voir entr'elles.
+
+- Lancer les VMs
+```
+vagrant up
+```
+
+- Voir l'état des nginx (as default user)
+```
+ansible all -m command -a "/usr/bin/systemctl status nginx"
+```
+
+- Voir l'état des nginx (as root)
+```
+ansible all -m command --become -a "/usr/bin/systemctl status nginx"
+```
+
+# vagrant-cluster-network
+
+OS: ubunty/xenial64
+
+Objectif: Monter les VMs en réseau avec docker
+
+- Lancer les VMs
+```
+vagrant up
+```
+
+- Vérifier que les docker répondent
+```
+ansible all --become -m command -a "/usr/bin/docker version"
 ```
