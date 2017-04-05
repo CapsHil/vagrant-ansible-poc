@@ -67,25 +67,25 @@ ansible all -m ping
 
 - ansible: lance la commande "/sbin/ip a" sur la machine "default"
 ```
-ansible default -m command -a "/sbin/ip a"
+ansible default -a "/sbin/ip a"
 ```
 
 - ansible: lance la commande "/bin/uname -a" sur la machine "default"
 ```
-ansible default -m command -a "/bin/uname -a"
+ansible default -a "/bin/uname -a"
 ```
 
 - ansible: utilisation du user root (--become)
 ```
-ansible default --become -m command -a "/usr/bin/systemctl status nginx"
+ansible default --become -a "/usr/bin/systemctl status nginx"
 ```
 
 ```
-ansible default --become -m command -a "/usr/bin/systemctl stop nginx"
+ansible default --become -a "/usr/bin/systemctl stop nginx"
 ```
 
 ```
-ansible default --become -m command -a "/usr/bin/systemctl start nginx"
+ansible default --become -a "/usr/bin/systemctl start nginx"
 ```
 
 On peut changer le contenu du playbook (playbook.yml) et appliquer les changements
@@ -109,12 +109,12 @@ vagrant up
 
 - Voir l'état des nginx (as default user)
 ```
-ansible all -m command -a "/usr/bin/systemctl status nginx"
+ansible all -a "/usr/bin/systemctl status nginx"
 ```
 
 - Voir l'état des nginx (as root)
 ```
-ansible all -m command --become -a "/usr/bin/systemctl status nginx"
+ansible all --become -a "/usr/bin/systemctl status nginx"
 ```
 
 # vagrant-cluster-network
@@ -138,5 +138,39 @@ ansible all --become -m command -a "/usr/bin/docker version"
 Note: Les IPs commencent par 192.168.77.21, puis +1 par VM
 
 ```
-ansible all --become -m command -a "/bin/ping -c 4 192.168.77.21"
+ansible all -a "/bin/ping -c 4 192.168.77.21"
+```
+
+# vagrant-cluster-swarm
+
+- Lancer les VMs
+```
+vagrant up
+```
+
+- Vérifier que swarm est activé
+```
+cyrille@cyrille-zenika:~/Documents/vagrant-ansible/vagrant-swarm$ ansible all --become -m shell -a "/usr/bin/docker info 2>/dev/null | /bin/grep ^Swarm"
+node3 | SUCCESS | rc=0 >>
+Swarm: active
+
+node2 | SUCCESS | rc=0 >>
+Swarm: active
+
+node1 | SUCCESS | rc=0 >>
+Swarm: active
+
+node4 | SUCCESS | rc=0 >>
+Swarm: active
+```
+
+- Voir la liste des noeuds
+```
+cyrille@cyrille-zenika:~/Documents/vagrant-ansible/vagrant-swarm$ ansible node1 --become -m shell -a "/usr/bin/docker node ls"
+node1 | SUCCESS | rc=0 >>
+ID                           HOSTNAME  STATUS  AVAILABILITY  MANAGER STATUS
+eungc6xajucaacwr8ogawuu1c    node3     Ready   Active        
+ijwjoia01y9dnfw87r7015xns    node4     Ready   Active        
+oj6lp8578toa65g11n1oqlsnd *  node1     Ready   Active        Leader
+qcnonkzmr69t8xizcetaw4dyc    node2     Ready   Active        
 ```
