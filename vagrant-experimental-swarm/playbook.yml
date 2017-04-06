@@ -1,0 +1,98 @@
+---
+- hosts: all
+  become: yes
+  gather_facts: no
+
+  pre_tasks:
+    - name: Install python2
+      raw: sudo apt-get -y install python-simplejson
+
+  tasks:
+    - name: Check if Docker is installed
+      stat: path=/etc/init.d/docker
+      register: docker_service
+
+    - name: Download Docker experimental from https://experimental.docker.com/
+      shell: curl -sSL https://experimental.docker.com/ -o /tmp/install-docker-experimental.sh
+#       uri: https://experimental.docker.com/
+#        dest: /tmp/install-docker-experimental.sh
+      when: docker_service.stat.exists == false
+
+    - name: Enable execution permission on /tmp/install-docker-experimental.sh
+      file:
+        path: /tmp/install-docker-experimental.sh
+        mode: 500
+      when: docker_service.stat.exists == false
+
+    - name: Install Docker experimental
+      shell: /tmp/install-docker-experimental.sh
+      when: docker_service.stat.exists == false
+      notify: 
+      - restart docker
+
+    - name: Ensure Docker is started
+      service:
+        name: docker
+        state: started
+
+  handlers:
+    - name: restart docker
+      service: name=docker state=restarted
+
+- hosts: node1
+  become: yes
+  tasks:
+    - name: Check if swarm already initialized on node1
+      shell: docker info 2>/dev/null | grep ^Swarm | cut -d' ' -f2
+      register: node_swarm_status
+
+    - name: Debug node_swarm_status
+      debug: msg="{{node_swarm_status.stdout}}"
+
+    - name: Init swarm on node1 if not already
+      command: docker swarm init --advertise-addr=enp0s8
+      when:
+        - node_swarm_status.stdout != "active"
+
+    - name: Dump worker token in node1 to join swarm on node2+
+      command: docker swarm join-token worker -q
+      register: swarm_worker_token
+
+    - name: Dump manager token in node1 to join swarm on node2+
+      command: docker swarm join-token manager -q
+      register: swarm_manager_token
+
+    - name: Debug swarm_worker_token
+      debug: msg="{{swarm_worker_token.stdout}}"
+
+    - name: Debug swarm_manager_token
+      debug: msg="{{swarm_manager_token.stdout}}"
+
+- hosts: manager
+  become: yes
+  tasks:
+    - name: Check if node already joined swarm cluster
+      shell: docker info 2>/dev/null | grep ^Swarm | cut -d' ' -f2
+      register: node_swarm_status
+
+    - name: Join swarm on node2+ as manager
+      command: docker swarm join --token "{{hostvars['node1']['swarm_manager_token'].stdout}}" 192.168.77.21:2377
+      when:
+        - hostvars['node1']['swarm_manager_token'] is defined
+        - node_swarm_status.stdout != "active"
+        - inventory_hostname != "node1"
+
+- hosts: worker
+  become: yes
+  tasks:
+    - name: Check if node already joined swarm cluster
+      shell: docker info 2>/dev/null | grep ^Swarm | cut -d' ' -f2
+      register: node_swarm_status
+
+    - name: Join swarm on node2+ as worker
+      command: docker swarm join --token "{{hostvars['node1']['swarm_worker_token'].stdout}}" 192.168.77.21:2377
+      when:
+        - hostvars['node1']['swarm_worker_token'] is defined
+        - node_swarm_status.stdout != "active"
+        - inventory_hostname != "node1"
+
