@@ -317,7 +317,7 @@ $ ansible all -a "/bin/ping -c 4 192.168.77.21"
 
 # vagrant-cluster-swarm
 
-Objectif: monter un cluster Swarm avec 4 noeud, dont 3 sont des managers et un est un worker, afin d'assurer la haute dispo des managers
+Objectif: monter un cluster Swarm avec 4 noeuds, dont 3 sont des managers et un est un worker, afin d'assurer la haute dispo des managers
 
 - Lancer les VMs
 ```
@@ -340,13 +340,53 @@ node4 | SUCCESS | rc=0 >>
 Swarm: active
 ```
 
-- Voir la liste des noeuds
+- Vérifier que les noeuds manager/worker sont bien montés
 ```
-$ ansible node1 --become -m command -a "/usr/bin/docker node ls"
+$ ansible node1 --become -m shell -a "docker node ls"
 node1 | SUCCESS | rc=0 >>
 ID                           HOSTNAME  STATUS  AVAILABILITY  MANAGER STATUS
 0w8zhurv8imzfnrl5e3w0vng4    node3     Ready   Active        Reachable
 7ygu341xqp68814jxngpyyudl    node2     Ready   Active        Reachable
 cplhbrf0mq8l8j4kuftz7hzwf *  node1     Ready   Active        Leader
 za4h2o4wg7sj7htvo7oylce2j    node4     Ready   Active        
+```
+
+# vagrant-experimental-swarm
+
+Objectif: monter un cluster Swarm avec 4 noeuds à base de Docker en version experimentale, dont 3 sont des managers et un est un worker, afin d'assurer la haute dispo des managers.
+
+See: https://github.com/docker/docker/tree/master/experimental
+
+- Lancer les VMs
+```
+$ vagrant up
+```
+
+Note: Attention ça va être long...
+
+- Vérifier que les noeuds manager/worker sont bien montés
+```
+$ ansible node1 --become -m shell -a "docker node ls"
+node1 | SUCCESS | rc=0 >>
+ID                           HOSTNAME  STATUS  AVAILABILITY  MANAGER STATUS
+4h9y8h41gpd3n1m2u81p74t5k *  node1     Ready   Active        Leader
+823d4c1tpcgr1kvukxfx82358    node4     Ready   Active        
+bjgjmnbbq6xz7ns1gol1u866p    node2     Ready   Active        Reachable
+dzf7yflhxbro257qrzcxuxaoz    node3     Ready   Active        Reachable
+
+```
+- Vérifier que les dockers sont bien en version experimentale
+```
+$ ansible all --become -m shell -a "docker version -f \{\{.Server.Experimental\}\}"
+node1 | SUCCESS | rc=0 >>
+true
+
+node2 | SUCCESS | rc=0 >>
+true
+
+node3 | SUCCESS | rc=0 >>
+true
+
+node4 | SUCCESS | rc=0 >>
+true
 ```
