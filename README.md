@@ -476,22 +476,6 @@ ID  NAME  REPLICAS  IMAGE  COMMAND
 
 # Faire joujou avec un petit projet de TD
 
-- Cloner le TD
-```
-$ git clone https://github.com/docker-training/orchestration-workshop
-```
-
-- Ajout config ansible
-```
-$ cd orchestration-workshop
-$ cat ansible.cfg
-[defaults]
-inventory = ../../../vagrant-experimental-swarm/.vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory
-# Sad but https://github.com/ansible/ansible/issues/9442
-host_key_checking = False
-```
-Note: changer le chemin relatif vers vagrant-experimental-swarm
-
 - Créer un réseau interne avec résolution DNS
 ```
 $ ansible node1 --become -m shell -a "docker network create --driver overlay dockercoins"
@@ -521,7 +505,7 @@ node1 | SUCCESS | rc=0 >>
 cg1jr3fdv5l0xkdb4997udyvg
 ```
 
-- 
+- Créer tous les autres services
 ```
 $ ansible node1 --become -m shell -a "docker service create --network dockercoins --name hasher clevandowski/dockercoins_hasher:1.0"
 $ ansible node1 --become -m shell -a "docker service create --network dockercoins --name rng clevandowski/dockercoins_rng:1.0"
@@ -529,11 +513,13 @@ $ ansible node1 --become -m shell -a "docker service create --network dockercoin
 $ ansible node1 --become -m shell -a "docker service create --network dockercoins --name worker clevandowski/dockercoins_worker:1.0"
 ```
 
+- Publier l'ihm sur le port 8080
 ```
 $ ansible node1 --become -m shell -a "docker service update webui --publish-add 8080:80"
 node1 | SUCCESS | rc=0 >>
 webui
 ```
+Voir l'ihm : http://localhost:8080
 
 ```
 $ ansible node1 --become -m shell -a "docker service update worker --replicas 10"
@@ -568,9 +554,9 @@ c6y4pavvsdgie4qhocas0x1i9  worker.4   clevandowski/dockercoins_worker:1.0  node1
 6bv1zqgia0krxdgnvj2kj1ww4  worker.10  clevandowski/dockercoins_worker:1.0  node3  Running        Running about a minute ago
 ```
 
-- Scale the rng service
-1) Remove the existing rng service
-2) Re-create the rng service with global scheduling
+- Redimensionner le cluster du service rng en mode "global" (1 instance par noeud)
+1) Supprimer le service rng existant
+2) Re-créer le service rng en mode global scheduling
 
 ```
 $ ansible node1 --become -m shell -a "docker service rm rng"
@@ -605,7 +591,7 @@ ID                         NAME     IMAGE                             NODE   DES
 egcc3kb48o8ptmak41qkdbkwt   \_ rng  clevandowski/dockercoins_rng:1.0  node1  Running        Running about a minute ago
 ```
 
-- Suivre l'évolution des worker
+- Suivre l'évolution des workers
 ```
 $ vagrant ssh node1
 ubuntu@node1$ watch -n1 sudo docker service ps worker | grep -v Shutdown.*Shutdown"
@@ -681,8 +667,8 @@ Mettre à jour la version du service worker
 $ vagrant ssh node1
 ubuntu@node1:~$ sudo vi /tmp/docker-compose.yml
 # Mettre le service "clevandowski/dockercoins_worker" en version 1.1 et sauvegarder (esc : x)
-# Puis on relance la commande pour prendre en compte le changement.
-# Regardez la 1ere session avec le watch et l'évolution du graphique sur la webui
+# Puis on relance la commande "docker stack deploy" pour prendre en compte le changement.
+# Regardez la 1ere session avec le watch et l'évolution du graphique sur la webui http://localhost:8080
 ubuntu@node1:~$ sudo docker stack deploy --compose-file /tmp/docker-compose.yml dockercoins
 ```
 
