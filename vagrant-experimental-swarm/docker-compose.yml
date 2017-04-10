@@ -17,8 +17,6 @@ services:
     image: clevandowski/dockercoins_webui:1.0
     ports:
     - "8080:80"
-#    volumes:
-#    - "/tmp/webui/files/:/files/"
 
   redis:
     image: redis
