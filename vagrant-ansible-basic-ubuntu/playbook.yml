@@ -1,0 +1,22 @@
+---
+- hosts: all
+  become: yes
+  gather_facts: no
+
+  pre_tasks:
+    - name: Install python2
+      raw: sudo apt-get -y install python-simplejson
+
+  tasks:
+    - name: ensure ntpd is at the latest version
+      apt: name=ntp state=latest
+      become: yes
+      notify:
+      - restart ntp
+    - name: ensure ntp is running
+      service: name=ntp state=started
+      become: yes
+  handlers:
+    - name: restart ntp
+      service: name=ntp state=restarted
+      become: yes

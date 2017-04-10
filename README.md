@@ -1,8 +1,27 @@
 # Requirement
 
 - vagrant 1.9.3
-- ansible 2.2.1.0 (bug avec la 2.2.2.0)
-- virtualbox 5.0
+  https://releases.hashicorp.com/vagrant/1.9.3/vagrant_1.9.3_x86_64.deb
+
+- ansible 2.2.1.0 
+
+Bug avec la 2.2.2.0 sur "vagrant-cluster-basic":
+```
+cyrille@cyrille-zenika:~/Documents/vagrant-ansible/vagrant-cluster-basic$ ansible all -m ping
+ERROR! Unexpected Exception: 'Host' object has no attribute 'remove_group'
+to see the full traceback, use -vvv
+```
+
+Downgrad to ansible-2.2.1.0, cf https://github.com/ansible/ansible/issues/23016
+```
+$ sudo apt-get remove ansible
+$ curl -LO https://launchpad.net/~ansible/+archive/ubuntu/ansible/+files/ansible_2.2.1.0-1ppa~xenial_all.deb
+$ sudo dpkg -i ansible_2.2.1.0-1ppa~xenial_all.deb
+$ sudo apt-mark hold ansible
+```
+
+- virtualbox 5.0 (bug avec )
+
 
 # Common commands
 
@@ -390,3 +409,284 @@ true
 node4 | SUCCESS | rc=0 >>
 true
 ```
+
+# Faire joujou avec vagrant-experimental-swarm
+
+- Lancer un service bébète
+```
+$ ansible node1 --become -m shell -a "docker service create alpine ping 8.8.8.8"
+node1 | SUCCESS | rc=0 >>
+apebpaz1xiaajkz3z5464d8ha
+```
+
+- Voir la liste des services
+```
+$ ansible node1 --become -m shell -a "docker service  ls"
+node1 | SUCCESS | rc=0 >>
+ID            NAME          REPLICAS  IMAGE   COMMAND
+apebpaz1xiaa  loving_morse  1/1       alpine  ping 8.8.8.8
+```
+
+- Voir la liste des containers pour un service
+```
+$ ansible node1 --become -m shell -a "docker service ps loving_morse"
+node1 | SUCCESS | rc=0 >>
+ID                         NAME            IMAGE   NODE   DESIRED STATE  CURRENT STATE          ERROR
+3woy5l97ijaa5t5werhk4zz6n  loving_morse.1  alpine  node1  Running        Running 4 minutes ago  
+```
+
+- Augmenter le nombre de replicas
+```
+$ ansible node1 --become -m shell -a "docker service update loving_morse --replicas 8"
+node1 | SUCCESS | rc=0 >>
+loving_morse
+```
+
+- Vérifier que les replicas sont bien créés
+```
+$ ansible node1 --become -m shell -a "docker service ps loving_morse"
+node1 | SUCCESS | rc=0 >>
+ID                         NAME            IMAGE   NODE   DESIRED STATE  CURRENT STATE           ERROR
+3woy5l97ijaa5t5werhk4zz6n  loving_morse.1  alpine  node1  Running        Running 27 minutes ago  
+adonmhyvrv24gwtbqzo95bb66  loving_morse.2  alpine  node2  Running        Running 54 seconds ago  
+9oag9gg04e7gl451vrgtgk8ux  loving_morse.3  alpine  node3  Running        Running 55 seconds ago  
+8u87ldkm4zuxclvxg1p3pho57  loving_morse.4  alpine  node4  Running        Running 55 seconds ago  
+51fkkg5kzw8uco9w20a63gy4c  loving_morse.5  alpine  node4  Running        Running 55 seconds ago  
+91c4gwq1u4eiih0314ilrl2td  loving_morse.6  alpine  node1  Running        Running 54 seconds ago  
+37h16bm2a2v4fobi7k2hqfp3d  loving_morse.7  alpine  node3  Running        Running 54 seconds ago  
+88ehlszlh83mioiyb2602fecw  loving_morse.8  alpine  node2  Running        Running 54 seconds ago
+```
+
+- Arrêter tous les service
+```
+$ ansible node1 --become -m shell -a "docker service rm \$(docker service ls -q)"
+node1 | SUCCESS | rc=0 >>
+apebpaz1xiaajkz3z5464d8ha
+```
+
+- Vérifier que les services sont bien détruits
+```
+$ ansible node1 --become -m shell -a "docker service ls"
+node1 | SUCCESS | rc=0 >>
+ID  NAME  REPLICAS  IMAGE  COMMAND
+```
+
+# Faire joujou avec un petit projet de TD
+
+- Cloner le TD
+```
+$ git clone https://github.com/docker-training/orchestration-workshop
+```
+
+- Ajout config ansible
+```
+$ cd orchestration-workshop
+$ cat ansible.cfg
+[defaults]
+inventory = ../../../vagrant-experimental-swarm/.vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory
+# Sad but https://github.com/ansible/ansible/issues/9442
+host_key_checking = False
+```
+Note: changer le chemin relatif vers vagrant-experimental-swarm
+
+- Créer un réseau interne avec résolution DNS
+```
+$ ansible node1 --become -m shell -a "docker network create --driver overlay dockercoins"
+node1 | SUCCESS | rc=0 >>
+aoz91humoswovpca2wky04bvy
+```
+
+- Voir le nouveau réseau overlay
+```
+$ ansible node1 --become -m shell -a "docker network ls"
+node1 | SUCCESS | rc=0 >>
+NETWORK ID          NAME                DRIVER              SCOPE
+53e0e78cdbce        bridge              bridge              local               
+d4a4e7c386dd        docker_gwbridge     bridge              local               
+aoz91humoswo        dockercoins         overlay             swarm               
+397c0afa5f22        host                host                local               
+42bka6i7ggvs        ingress             overlay             swarm               
+42473e68c836        none                null                local
+```
+
+Note: seuls les nodes managers du swarm donnent des infos sur le réseau dockercoins, les workers ne sont pas habilités à le faire 
+
+- Créer le service "redis"
+```
+$ ansible node1 --become -m shell -a "docker service create --network dockercoins --name redis redis"
+node1 | SUCCESS | rc=0 >>
+cg1jr3fdv5l0xkdb4997udyvg
+```
+
+- 
+```
+$ ansible node1 --become -m shell -a "docker service create --network dockercoins --name hasher clevandowski/dockercoins_hasher:1.0"
+$ ansible node1 --become -m shell -a "docker service create --network dockercoins --name rng clevandowski/dockercoins_rng:1.0"
+$ ansible node1 --become -m shell -a "docker service create --network dockercoins --name webui clevandowski/dockercoins_webui:1.0"
+$ ansible node1 --become -m shell -a "docker service create --network dockercoins --name worker clevandowski/dockercoins_worker:1.0"
+```
+
+```
+$ ansible node1 --become -m shell -a "docker service update webui --publish-add 8080:80"
+node1 | SUCCESS | rc=0 >>
+webui
+```
+
+```
+$ ansible node1 --become -m shell -a "docker service update worker --replicas 10"
+node1 | SUCCESS | rc=0 >>
+worker
+```
+
+```
+$ ansible node1 --become -m shell -a "docker service ls"
+node1 | SUCCESS | rc=0 >>
+ID            NAME    REPLICAS  IMAGE                                COMMAND
+2pct87snetdi  worker  7/10      clevandowski/dockercoins_worker:1.0  
+3sq0r0n5rp38  hasher  1/1       clevandowski/dockercoins_hasher:1.0  
+4p4n1mnat4qq  webui   1/1       clevandowski/dockercoins_webui:1.0   
+8u9js7wnrzrd  rng     1/1       clevandowski/dockercoins_rng:1.0     
+b97lgedweff6  redis   1/1       redis                                
+```
+
+```
+$ ansible node1 --become -m shell -a "docker service ps worker"
+node1 | SUCCESS | rc=0 >>
+ID                         NAME       IMAGE                                NODE   DESIRED STATE  CURRENT STATE               ERROR
+4t0j31hntglovoz756fztd81v  worker.1   clevandowski/dockercoins_worker:1.0  node3  Running        Running 10 minutes ago      
+ag08dl0qbz803uts26e5w9apy  worker.2   clevandowski/dockercoins_worker:1.0  node1  Running        Running about a minute ago  
+1shwjpw76gftpy043r5iff0u3  worker.3   clevandowski/dockercoins_worker:1.0  node4  Running        Running about a minute ago  
+c6y4pavvsdgie4qhocas0x1i9  worker.4   clevandowski/dockercoins_worker:1.0  node1  Running        Running about a minute ago  
+7g20dhlcotrwvtoj02mmzvgrg  worker.5   clevandowski/dockercoins_worker:1.0  node3  Running        Running about a minute ago  
+0sz49tgxswxyqzcghgu245cah  worker.6   clevandowski/dockercoins_worker:1.0  node2  Running        Preparing 2 minutes ago     
+05a2mg3to5e2cfaqh50hhtanz  worker.7   clevandowski/dockercoins_worker:1.0  node2  Running        Preparing 2 minutes ago     
+7e4rehacrke7vmit3gxubhiip  worker.8   clevandowski/dockercoins_worker:1.0  node4  Running        Running about a minute ago  
+710fsrzmjus7mnqldxv61jy9t  worker.9   clevandowski/dockercoins_worker:1.0  node2  Running        Preparing 2 minutes ago     
+6bv1zqgia0krxdgnvj2kj1ww4  worker.10  clevandowski/dockercoins_worker:1.0  node3  Running        Running about a minute ago  
+```
+
+- Scale the rng service
+1) Remove the existing rng service
+2) Re-create the rng service with global scheduling
+
+```
+$ ansible node1 --become -m shell -a "docker service rm rng"
+node1 | SUCCESS | rc=0 >>
+rng
+```
+
+```
+$ ansible node1 --become -m shell -a "docker service create --network dockercoins --name rng --mode global clevandowski/dockercoins_rng:1.0"
+node1 | SUCCESS | rc=0 >>
+7cd7wpzatd14xi6eovkd28zep
+```
+
+```
+$ ansible node1 --become -m shell -a "docker service ls"
+node1 | SUCCESS | rc=0 >>
+ID            NAME    REPLICAS  IMAGE                                COMMAND
+2pct87snetdi  worker  10/10     clevandowski/dockercoins_worker:1.0  
+3sq0r0n5rp38  hasher  1/1       clevandowski/dockercoins_hasher:1.0  
+4p4n1mnat4qq  webui   1/1       clevandowski/dockercoins_webui:1.0   
+7cd7wpzatd14  rng     global    clevandowski/dockercoins_rng:1.0     
+b97lgedweff6  redis   1/1       redis                                
+```
+
+```
+$ ansible node1 --become -m shell -a "docker service ps rng"
+node1 | SUCCESS | rc=0 >>
+ID                         NAME     IMAGE                             NODE   DESIRED STATE  CURRENT STATE               ERROR
+9n9p0w63ul42zlmcyds7xetmv  rng      clevandowski/dockercoins_rng:1.0  node3  Running        Running 16 seconds ago      
+41q564srfnraqqwu1i8yi5xxk   \_ rng  clevandowski/dockercoins_rng:1.0  node2  Running        Running about a minute ago  
+1q7sb2j46ga17o3qln6cmh5bi   \_ rng  clevandowski/dockercoins_rng:1.0  node4  Running        Running about a minute ago  
+egcc3kb48o8ptmak41qkdbkwt   \_ rng  clevandowski/dockercoins_rng:1.0  node1  Running        Running about a minute ago  
+```
+
+- Suivre l'évolution des worker
+```
+$ vagrant ssh node1
+ubuntu@node1$ watch -n1 sudo docker service ps worker | grep -v Shutdown.*Shutdown"
+```
+
+- Monter le worker de version
+```
+$ ansible node1 --become -m shell -a "docker service update worker --image clevandowski/dockercoins_worker:1.1"
+node1 | SUCCESS | rc=0 >>
+worker
+```
+Voir le watch pour suivre la montée de version.
+
+Repasser en 1.0 pour le fun.
+
+- Modifier le rythme des updates
+```
+$ ansible node1 --become -m shell -a "docker service update worker --update-parallelism 2 --update-delay 5s"
+```
+
+# Utiliser docker swarm avancé
+
+- Arrêter tous les services pour faire du ménage
+```
+$ ansible node1 --become -m shell -a "docker service rm \$(docker service ls -q)"
+```
+
+- Dans le projet orchestration-workshop, le fichier docker-compose.yml doit contenir ceci:
+```
+version: "3"
+
+services:
+  rng:
+    image: clevandowski/dockercoins_rng:1.0
+    ports:
+    - "8001:80"
+
+  hasher:
+    image: clevandowski/dockercoins_hasher:1.0
+    ports:
+    - "8002:80"
+
+  webui:
+    image: clevandowski/dockercoins_webui:1.0
+    ports:
+    - "8080:80"
+    volumes:
+    - "/tmp/webui/files/:/files/"
+
+  redis:
+    image: redis
+
+  worker:
+    image: clevandowski/dockercoins_worker:1.0
+```
+
+- Préparer le bundle
+Dans le répertoire du projet orchestration-workshop
+```
+$ ansible node1 --become -m shell -a "docker deploy --compose-file /tmp/docker-compose.yml dockercoins"
+node1 | SUCCESS | rc=0 >>
+Creating network dockercoins_default
+Creating service dockercoins_webui
+Creating service dockercoins_redis
+Creating service dockercoins_worker
+Creating service dockercoins_rng
+Creating service dockercoins_hasher
+```
+
+- Vérifier que les services sont lancés
+Connecté sur node1 en ssh, sinon encapsuler 'sudo <COMMAND>' par 'ansible node1 --become -m shell -a <COMMAND>'
+```
+$ sudo docker service ls
+ID            NAME                MODE        REPLICAS  IMAGE
+8npql0nyf4xa  dockercoins_redis   replicated  1/1       redis:latest
+njqav10tcam0  dockercoins_webui   replicated  1/1       clevandowski/dockercoins_webui:1.0
+o9252ex6hck8  dockercoins_hasher  replicated  1/1       clevandowski/dockercoins_hasher:1.0
+sjbb2w2eyx8n  dockercoins_rng     replicated  4/4       clevandowski/dockercoins_rng:1.0
+zcganxaix2xt  dockercoins_worker  replicated  8/8       clevandowski/dockercoins_worker:1.0
+```
+
+- Mettre 10 replicas pour le service dockercoins_worker
+```
+ubuntu@node1:~$ sudo docker service update --replicas 10 dockercoins_worker
+dockercoins_worker
+```
+

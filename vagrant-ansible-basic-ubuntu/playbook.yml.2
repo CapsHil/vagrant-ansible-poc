@@ -1,0 +1,23 @@
+---
+- hosts: all
+  tasks:
+    - name: ensure ntpd is at the latest version
+      yum: pkg=ntp state=latest
+      become: yes
+      notify:
+      - restart ntpd
+    - name: installing nginx repo rpm
+      yum: name=http://nginx.org/packages/centos/7/noarch/RPMS/nginx-release-centos-7-0.el7.ngx.noarch.rpm
+      become: yes
+    - name: ensure nginx is at the latest version
+      yum: pkg=nginx state=latest
+      become: yes
+      notify:
+      - restart nginx
+  handlers:
+    - name: restart ntpd
+      service: name=ntpd state=restarted
+      become: yes
+    - name: restart nginx
+      service: name=nginx state=restarted
+      become: yes

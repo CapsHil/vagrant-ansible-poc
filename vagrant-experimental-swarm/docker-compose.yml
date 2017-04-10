@@ -1,0 +1,35 @@
+version: "3"
+
+services:
+  rng:
+    image: clevandowski/dockercoins_rng:1.0
+    ports:
+    - "8001:80"
+    deploy:
+      replicas: 4
+
+  hasher:
+    image: clevandowski/dockercoins_hasher:1.0
+    ports:
+    - "8002:80"
+
+  webui:
+    image: clevandowski/dockercoins_webui:1.0
+    ports:
+    - "8080:80"
+#    volumes:
+#    - "/tmp/webui/files/:/files/"
+
+  redis:
+    image: redis
+
+  worker:
+    image: clevandowski/dockercoins_worker:1.0
+    depends_on:
+      - rng
+      - hasher
+      - redis
+    deploy:
+      replicas: 8
+      update_config:
+        parallelism: 2

@@ -1,0 +1,13 @@
+---
+- hosts: all
+  tasks:
+    - name: ensure ntpd is at the latest version
+      yum: pkg=ntp state=latest
+      become: yes
+      notify:
+      - restart ntpd
+  handlers:
+    - name: restart ntpd
+      service: name=ntpd state=restarted
+      become: yes
+
