@@ -1,0 +1,13 @@
+---
+- include: swarm.yml
+
+- hosts: all
+  become: yes
+  gather_facts: no
+
+  tasks: 
+  - name: Ensure vm.max_map_count=262144
+    sysctl:
+      sysctl_set: yes
+      name: vm.max_map_count
+      value: 262144
